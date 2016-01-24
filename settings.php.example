@@ -1,0 +1,9 @@
+<?php
+$db = array(
+  'host' => '',
+  'user' => '',
+  'password' => '',
+  'port' => '',
+  'schema' => '',
+  'encoding' => ''
+);
