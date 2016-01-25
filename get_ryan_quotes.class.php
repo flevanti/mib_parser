@@ -95,16 +95,44 @@ class get_ryan_quotes {
       $this->fares['metadata']['ts'] = time();
       echo "SAVING TRIP FARES TO DB" . $this->nl;
       $this->storeFaresInDB();
-      echo "UPDATING DEPARTURES INFORMATION" . $this->nl;
-      $this->updateFaresDeparturesInfo();
       echo "TRIP PROCESSED" . $this->nl;
       $this->fares = NULL;
       unset($this->fares);
 
     } //for each trip
-
+    echo "UPDATING DEPARTURES INFORMATION" . $this->nl;
+    $this->updateFaresDeparturesInfo();
+    echo "UPDATING FARES TO NUMBERS" . $this->nl;
+    $this->updateFaresValuesToNumbers();
+    echo "PROCESS COMPLETED" . $this->nl . $this->nl;
   }
 
+
+  function updateFaresValuesToNumbers() {
+    if (empty($this->dbh)) {
+      $this->dbh = $this->connectToDb();
+    }
+    $sql_args = array($this->session_id);
+    $sql = "UPDATE ryan_raw
+            SET fare_eco_               = fare_eco,
+              fare_eco_published_       = fare_eco_published,
+              fare_business_            = fare_business,
+              fare_business_published_  = fare_business_published
+            WHERE import_session_id     = ?;";
+
+    try {
+      $stmt = $this->dbh->prepare($sql);
+      if ($stmt) {
+        $stmt->execute($sql_args);
+      }
+    } catch (Exception $e) {
+      echo "OOOPS, something went wrong! " . $e->getMessage() . $this->nl;
+    }
+
+    $stmt = NULL;
+    unset($stmt);
+
+  }
 
   function updateFaresDeparturesInfo() {
     if (empty($this->dbh)) {
@@ -112,12 +140,11 @@ class get_ryan_quotes {
     }
     $sql_args = array($this->session_id);
     $sql = "UPDATE ryan_raw
-            SET departure_yyyymmdd = replace(substring(departure, 1, 10), '-', ''),
-              departure_yyyy       = substring(departure_yyyymmdd, 1, 4),
-              departure_mm         = substring(departure_yyyymmdd, 5, 2),
-              departure_dd         = substring(departure_yyyymmdd, 7, 2)
-            WHERE departure_yyyymmdd IS NULL
-              AND import_session_id = ?;";
+            SET departure_yyyymmdd  = replace(substring(departure, 1, 10), '-', ''),
+              departure_yyyy        = substring(departure_yyyymmdd, 1, 4),
+              departure_mm          = substring(departure_yyyymmdd, 5, 2),
+              departure_dd          = substring(departure_yyyymmdd, 7, 2)
+            WHERE import_session_id = ?;";
 
     try {
       $stmt = $this->dbh->prepare($sql);
