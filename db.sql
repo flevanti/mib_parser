@@ -22,4 +22,13 @@ CREATE TABLE `ryan_raw` (
   DEFAULT CHARSET = utf8;
 
 
+ALTER TABLE ryan_raw ADD import_session_id VARCHAR(100) NULL;
+ALTER TABLE ryan_raw ADD departure_yyyymmdd CHAR(8) NULL;
+ALTER TABLE ryan_raw ADD departure_mm CHAR(2) NULL;
+ALTER TABLE ryan_raw ADD departure_dd CHAR(2) NULL;
+ALTER TABLE ryan_raw ADD departure_yyyy CHAR(4) NULL;
+
+
+ALTER TABLE  `ryan_raw` ADD INDEX  `idx_session_id` (  `import_session_id` );
+ALTER TABLE  `ryan_raw` ADD INDEX  `idx_departure_yyyymmdd` (  `departure_yyyymmdd` );
 

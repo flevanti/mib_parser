@@ -2,16 +2,17 @@
 
 class get_ryan_quotes {
 
-  public $days_to_check = 250;
-  public $FlexDaysOut = 6;
-  public $airport_from;
-  public $airport_to;
+  protected $days_to_check = 30;
+  protected $days_offset = 0;
+  protected $FlexDaysOut = 6;
+  protected $airport_from;
+  protected $airport_to;
   //https://desktopapps.ryanair.com/availability?ADT=2&CHD=0&DateOut=2016-08-30&Destination=PSA&FlexDaysIn=0&FlexDaysOut=6&INF=0&Origin=STN&RoundTrip=true&TEEN=0
-  public $url = "https://desktopapps.ryanair.com/availability?ADT=2&CHD=0&INF=0&RoundTrip=false&TEEN=0";
-  protected $today_timestamp;
+  protected $url = "https://desktopapps.ryanair.com/availability?ADT=2&CHD=0&INF=0&RoundTrip=false&TEEN=0";
+  protected $first_timestamp;
   protected $last_timestamp;
   public $last_error;
-  public $trips = array(
+  protected $trips = array(
     array('STN', 'PSA'),
     array('STN', 'SUF'),
     array('PSA', 'STN'),
@@ -19,12 +20,12 @@ class get_ryan_quotes {
     array('PSA', 'CRV'),
     array('CRV', 'PSA')
   );
-
-  public $db_conn_info;
+  protected $db_conn_info;
   protected $dbh;
-  public $fares;
-  public $wait_before_next_page_request = 0.5; //seconds
+  protected $fares;
+  protected $wait_before_next_page_request = 0.5; //seconds
   protected $nl;
+  public $session_id = NULL;
 
   function __construct() {
 
@@ -35,26 +36,34 @@ class get_ryan_quotes {
       $this->nl = "<br>";
     }
 
-    $this->today_timestamp = $this->getTimestampWithoutTime(time());
-    $this->last_timestamp = $this->today_timestamp + ($this->days_to_check * 24 * 60 * 60);
-
-
   }
 
+  function setDaysOffset($days) {
+    $this->days_offset = $days;
+  }
+
+  function setDaysToCheck($days = NULL) {
+    if (!empty($days)) {
+      $this->days_to_check = $days;
+    }
+  }
 
   function getFares() {
-
+    $this->first_timestamp = $this->getTimestampWithoutTime(time() + ($this->days_offset * 24 * 60 * 60));
+    $this->last_timestamp = $this->first_timestamp + ($this->days_to_check * 24 * 60 * 60);
     $last_request_time = 0;
+    echo "IMPORT SESSION ID: " . $this->session_id . $this->nl;
+    echo "OFFSET DAYS: " . $this->days_offset . $this->nl;
+    echo "DAYS TO CHECK: " . $this->days_to_check . $this->nl;
+    echo "START DATE: " . date("d-m-Y", $this->first_timestamp) . $this->nl;
+    echo "END DATE: " . date("d-m-Y", $this->last_timestamp) . $this->nl;
     foreach ($this->trips as $trip) {
       $this->fares = array();
       $Origin = $trip[0];
       $Destination = $trip[1];
 
       echo "TRIP $Origin --> $Destination " . $this->nl;
-      echo "START DATE: " . date("d-m-Y", $this->today_timestamp) . $this->nl;
-      echo "END DATE: " . date("d-m-Y", $this->last_timestamp) . $this->nl;
-
-      for ($i = $this->today_timestamp; $i <= $this->last_timestamp; $i = $i + $this->FlexDaysOut * 24 * 60 * 60) {
+      for ($i = $this->first_timestamp; $i <= $this->last_timestamp; $i = $i + $this->FlexDaysOut * 24 * 60 * 60) {
         echo "CURRENT DATE PROCESSING: " . date("d-m-Y", $i) . $this->nl;
         //GOOD BOY
         $time_since_last_request = microtime(TRUE) - $last_request_time;
@@ -62,8 +71,6 @@ class get_ryan_quotes {
           usleep(($this->wait_before_next_page_request - $time_since_last_request) * 1000000);
         }
         $last_request_time = microtime(TRUE);
-        //
-
 
         $DateOut = date("Y-m-d", $i);
         $url = $this->url . "&Origin=$Origin&Destination=$Destination&DateOut=$DateOut&FlexDaysOut={$this->FlexDaysOut}";
@@ -88,15 +95,48 @@ class get_ryan_quotes {
       $this->fares['metadata']['ts'] = time();
       echo "SAVING TRIP FARES TO DB" . $this->nl;
       $this->storeFaresInDB();
+      echo "UPDATING DEPARTURES INFORMATION" . $this->nl;
+      $this->updateFaresDeparturesInfo();
       echo "TRIP PROCESSED" . $this->nl;
       $this->fares = NULL;
       unset($this->fares);
 
     } //for each trip
 
+  }
+
+
+  function updateFaresDeparturesInfo() {
+    if (empty($this->dbh)) {
+      $this->dbh = $this->connectToDb();
+    }
+    $sql_args = array($this->session_id);
+    $sql = "UPDATE ryan_raw
+            SET departure_yyyymmdd = replace(substring(departure, 1, 10), '-', ''),
+              departure_yyyy       = substring(departure_yyyymmdd, 1, 4),
+              departure_mm         = substring(departure_yyyymmdd, 5, 2),
+              departure_dd         = substring(departure_yyyymmdd, 7, 2)
+            WHERE departure_yyyymmdd IS NULL
+              AND import_session_id = ?;";
+
+    try {
+      $stmt = $this->dbh->prepare($sql);
+      if ($stmt) {
+        $stmt->execute($sql_args);
+      }
+    } catch (Exception $e) {
+      echo "OOOPS, something went wrong! " . $e->getMessage() . $this->nl;
+    }
+
+    $stmt = NULL;
+    unset($stmt);
 
   }
 
+
+  function setDbConnectionInfo($db_conn_info) {
+    $this->db_conn_info = $db_conn_info;
+  }
 
   protected function storeFaresInDB() {
 
@@ -120,7 +160,8 @@ class get_ryan_quotes {
                                       fare_eco_published,
                                       fare_business,
                                       fare_business_published,
-                                      raw_record
+                                      raw_record,
+                                      import_session_id
                                       )
                                   VALUES (
                                       :origin,
@@ -138,7 +179,8 @@ class get_ryan_quotes {
                                       :fare_eco_published,
                                       :fare_business,
                                       :fare_business_published,
-                                      :raw_record
+                                      :raw_record,
+                                      :import_session_id
                                       );";
 
     try {
@@ -165,6 +207,7 @@ class get_ryan_quotes {
         $args['fare_business'] = $fare['fare_business'];
         $args['fare_business_published'] = $fare['fare_business_published'];
         $args['raw_record'] = $fare['raw'];
+        $args['import_session_id'] = $this->session_id;
 
         if ($stmt->execute($args) === FALSE) {
           echo $stmt->errorCode() . " " . implode($this->nl, $stmt->errorInfo()) . $this->dbh->errorCode() . $this->nl;
@@ -180,7 +223,6 @@ class get_ryan_quotes {
     $stmt = NULL;
     $args = NULL;
     unset($args, $stmt);
-
 
   }
 
