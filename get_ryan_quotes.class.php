@@ -18,7 +18,9 @@ class get_ryan_quotes {
     array('PSA', 'STN'),
     array('SUF', 'STN'),
     array('PSA', 'CRV'),
-    array('CRV', 'PSA')
+    array('CRV', 'PSA'),
+    array('CIA', 'STN'),
+    array('STN', 'CIA')
   );
   protected $db_conn_info;
   protected $dbh;
