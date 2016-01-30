@@ -20,7 +20,9 @@ class get_ryan_quotes {
     'PSACRV' => array('PSA', 'CRV'),
     'CRVPSA' => array('CRV', 'PSA'),
     'CIASTN' => array('CIA', 'STN'),
-    'STNCIA' => array('STN', 'CIA')
+    'STNCIA' => array('STN', 'CIA'),
+    'CIACRV' => array('CIA', 'CRV'),
+    'CRVCIA' => array('CRV', 'CIA')
   );
   protected $db_conn_info;
   protected $dbh;
