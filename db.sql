@@ -44,6 +44,33 @@ ALTER TABLE ryan_raw ADD departure_secs_midnight INT NULL;
 
 CREATE INDEX idx_departure_ts ON ryan_raw (departure_ts);
 
+CREATE INDEX idx_trip ON ryan_raw (trip);
+
+
+CREATE TABLE ryan_data
+(
+  id                      INT(11) DEFAULT '0' NOT NULL,
+  flight_number           VARCHAR(45),
+  trip                    VARCHAR(45),
+  fare_currency           VARCHAR(45),
+  max_eco                 DECIMAL(7, 4),
+  min_eco                 DECIMAL(7, 4),
+  fare_eco_               DECIMAL(7, 4),
+  max_business            DECIMAL(7, 4),
+  min_business            DECIMAL(7, 4),
+  fare_business_          DECIMAL(7, 4),
+  departure_yyyymmdd      CHAR(8),
+  departure_mm            CHAR(2),
+  departure_dd            CHAR(2),
+  departure_secs_midnight INT(11),
+  ts_retrieved            INT(11),
+  import_session_id       VARCHAR(100)
+
+)
+  DEFAULT CHARSET = utf8;
+CREATE INDEX idx_trip ON ryan_data (trip);
+CREATE INDEX idx_fligth_number ON ryan_data (flight_number);
+
 
 /*
 

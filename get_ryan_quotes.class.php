@@ -13,14 +13,14 @@ class get_ryan_quotes {
   protected $last_timestamp;
   public $last_error;
   protected $trips = array(
-    array('STN', 'PSA'),
-    array('STN', 'SUF'),
-    array('PSA', 'STN'),
-    array('SUF', 'STN'),
-    array('PSA', 'CRV'),
-    array('CRV', 'PSA'),
-    array('CIA', 'STN'),
-    array('STN', 'CIA')
+    'STNPSA' => array('STN', 'PSA'),
+    'PSASTN' => array('PSA', 'STN'),
+    'STNSUF' => array('STN', 'SUF'),
+    'SUFSTN' => array('SUF', 'STN'),
+    'PSACRV' => array('PSA', 'CRV'),
+    'CRVPSA' => array('CRV', 'PSA'),
+    'CIASTN' => array('CIA', 'STN'),
+    'STNCIA' => array('STN', 'CIA')
   );
   protected $db_conn_info;
   protected $dbh;
@@ -108,11 +108,111 @@ class get_ryan_quotes {
     $this->updateFaresValuesToNumbers();
     echo "UPDATING TIMESTAMPS" . $this->nl;
     $this->updateTimestamps();
+    echo "REMOVING OLD TRIPS" . $this->nl;
+    $this->removeOldTrips();
+    echo "REMOVING OLD AGGREGATED DATA" . $this->nl;
+    $this->truncateTable("ryan_data");
+    echo "GENERATING NEW AGGREGATED DATA" . $this->nl;
+    $this->aggregateData();
     echo "PROCESS COMPLETED" . $this->nl . $this->nl;
   }
 
+  protected function truncateTable($t) {
+    $sql = "TRUNCATE $t;";
+    try {
+      $stmt = $this->dbh->prepare($sql);
+      if ($stmt) {
+        $stmt->execute();
+      }
+    } catch (Exception $e) {
+      echo "OOOPS, something went wrong! " . $e->getMessage() . $this->nl;
+    }
 
-  function updateTimestamps() {
+    $stmt = NULL;
+    unset($stmt);
+
+  }
+
+  protected function aggregateData() {
+
+    $sql = "INSERT INTO ryan_data
+                SELECT
+                  id,
+                  flight_number,
+                  trip,
+                  fare_currency,
+                  max(fare_eco_)      AS max_eco,
+                  min(fare_eco_)      AS min_eco,
+                  fare_eco_,
+                  max(fare_business_) AS max_business,
+                  min(fare_business_) AS min_business,
+                  fare_business_,
+                  departure_yyyymmdd,
+                  departure_mm,
+                  departure_dd,
+                  departure_secs_midnight,
+                  ts_retrieved,
+                  import_session_id
+                FROM (
+                       SELECT
+                         id,
+                         flight_number,
+                         trip,
+                         fare_currency,
+                         fare_eco_,
+                         fare_eco_published_,
+                         fare_business_,
+                         fare_business_published_,
+                         departure_yyyymmdd,
+                         departure_mm,
+                         departure_dd,
+                         departure_secs_midnight,
+                         ts_retrieved,
+                         import_session_id
+                       FROM ryan_raw
+                       -- where flight_number ='FR 1045'
+                       ORDER BY ts_retrieved DESC
+
+                     ) t
+                GROUP BY flight_number,
+                  trip,
+                  departure_yyyymmdd,
+                  departure_mm,
+                  departure_dd,
+                  departure_secs_midnight
+                ORDER BY trip, departure_yyyymmdd, departure_secs_midnight;";
+
+    try {
+      $stmt = $this->dbh->prepare($sql);
+      if ($stmt) {
+        $stmt->execute();
+      }
+    } catch (Exception $e) {
+      echo "OOOPS, something went wrong! " . $e->getMessage() . $this->nl;
+    }
+
+    $stmt = NULL;
+    unset($stmt);
+  }
+
+
+  protected function removeOldTrips() {
+    $sql = "DELETE FROM ryan_raw WHERE departure_ts < unix_timestamp();";
+    try {
+      $stmt = $this->dbh->prepare($sql);
+      if ($stmt) {
+        $stmt->execute();
+      }
+    } catch (Exception $e) {
+      echo "OOOPS, something went wrong! " . $e->getMessage() . $this->nl;
+    }
+
+    $stmt = NULL;
+    unset($stmt);
+
+  }
+
+  protected function updateTimestamps() {
     if (empty($this->dbh)) {
       $this->dbh = $this->connectToDb();
     }
@@ -140,7 +240,7 @@ class get_ryan_quotes {
   }
 
 
-  function updateFaresValuesToNumbers() {
+  protected function updateFaresValuesToNumbers() {
     if (empty($this->dbh)) {
       $this->dbh = $this->connectToDb();
     }
@@ -166,7 +266,7 @@ class get_ryan_quotes {
 
   }
 
-  function updateFaresDeparturesInfo() {
+  protected function updateFaresDeparturesInfo() {
     if (empty($this->dbh)) {
       $this->dbh = $this->connectToDb();
     }
@@ -348,7 +448,7 @@ class get_ryan_quotes {
   }
 
 
-  function getTimestampWithoutTime($ts = NULL) {
+  protected function getTimestampWithoutTime($ts = NULL) {
     if (is_null($ts)) {
       $ts = time();
     }
