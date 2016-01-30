@@ -57,18 +57,15 @@ $sql = "SELECT flight_number, FROM_UNIXTIME(departure_secs_midnight,'%H:%i') AS 
 $stmt = $dbh->prepare($sql);
 $stmt->execute(array($trip_requested));
 
+echo "<b>$trip_requested</b> " . $stmt->rowCount() . " flights found<br><br>";
 
 while ($flight = $stmt->fetch(PDO::FETCH_ASSOC)) {
 
   echo $flight['flight_number'] . " (" . $flight['departure'] . ")<br>";
 
-  $chart_container= "container_" . $flight['flight_number'];
+  $chart_container = "container_" . $flight['flight_number'];
 
-  echo "<div id=\"".$chart_container."\" style=\"min-width: 310px; height: 200px; margin: 0 auto\"></div>";
-
-
-
-
+  echo "<div id=\"" . $chart_container . "\" style=\"min-width: 310px; height: 200px; margin: 0 auto\"></div>";
 
 
 }
@@ -77,7 +74,8 @@ while ($flight = $stmt->fetch(PDO::FETCH_ASSOC)) {
 ?>
 
 
-<div id="container" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+<div id="container"
+     style="min-width: 310px; height: 400px; margin: 0 auto"></div>
 
 <script>
   $(function () {
@@ -172,8 +170,7 @@ while ($flight = $stmt->fetch(PDO::FETCH_ASSOC)) {
         valueSuffix: '°C'
       },
 
-      legend: {
-      },
+      legend: {},
 
       series: [{
         name: 'Temperature',
