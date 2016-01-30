@@ -22,7 +22,7 @@ $trip_requested_allowed = FALSE;
 $trips = $dbh->query("SELECT trip, count(*) AS c FROM ryan_data GROUP BY trip ORDER BY trip;");
 
 while ($trip = $trips->fetch(PDO::FETCH_ASSOC)) {
-  echo $trip['trip'] . " (" . $trip['c'] . " trips)&nbsp;&nbsp;&nbsp;&nbsp;";
+  echo "<a href='?trip=" . $trip['trip'] . "'>" . $trip['trip'] . "</a> (" . $trip['c'] . " trips)&nbsp;&nbsp;&nbsp;&nbsp;";
   if ($trip_requested !== FALSE && $trip_requested == $trip['trip']) {
     $trip_requested_allowed = TRUE;
   }
