@@ -106,7 +106,37 @@ class get_ryan_quotes {
     $this->updateFaresDeparturesInfo();
     echo "UPDATING FARES TO NUMBERS" . $this->nl;
     $this->updateFaresValuesToNumbers();
+    echo "UPDATING TIMESTAMPS" . $this->nl;
+    $this->updateTimestamps();
     echo "PROCESS COMPLETED" . $this->nl . $this->nl;
+  }
+
+
+  function updateTimestamps() {
+    if (empty($this->dbh)) {
+      $this->dbh = $this->connectToDb();
+    }
+    $sql_args = array($this->session_id);
+    $sql = "UPDATE ryan_raw
+              SET departure_ts          = unix_timestamp(STR_TO_DATE(`departure`, '%Y-%m-%dT%H:%i:%s.000')),
+                arrival_ts              = unix_timestamp(STR_TO_DATE(`arrival`, '%Y-%m-%dT%H:%i:%s.000')),
+                departure_secs_midnight = (FROM_UNIXTIME(departure_ts, '%H') * 60 * 60) + (FROM_UNIXTIME(departure_ts, '%i') * 60) +
+                                          (FROM_UNIXTIME(departure_ts, '%s'))
+              WHERE import_session_id   = ?;";
+
+    try {
+      $stmt = $this->dbh->prepare($sql);
+      if ($stmt) {
+        $stmt->execute($sql_args);
+      }
+    } catch (Exception $e) {
+      echo "OOOPS, something went wrong! " . $e->getMessage() . $this->nl;
+    }
+
+    $stmt = NULL;
+    unset($stmt);
+
+
   }
 
 

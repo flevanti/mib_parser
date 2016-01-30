@@ -38,6 +38,13 @@ ALTER TABLE ryan_raw ADD fare_business_ DECIMAL(7, 3) NULL;
 ALTER TABLE ryan_raw ADD fare_business_published_ DECIMAL(7, 3) NULL;
 
 
+ALTER TABLE ryan_raw ADD departure_ts INT NULL;
+ALTER TABLE ryan_raw ADD arrival_ts INT NULL;
+ALTER TABLE ryan_raw ADD departure_secs_midnight INT NULL;
+
+CREATE INDEX idx_departure_ts ON ryan_raw (departure_ts);
+
+
 /*
 
 SCRIPT USED TO UPDATE DB - NO NEED TO RUN THESE ON NEW DEPLOYMENT
@@ -54,5 +61,15 @@ SET departure_yyyymmdd = replace(substring(departure, 1, 10), '-', ''),
   departure_yyyy       = substring(departure_yyyymmdd, 1, 4),
   departure_mm         = substring(departure_yyyymmdd, 5, 2),
   departure_dd         = substring(departure_yyyymmdd, 7, 2);
+
+
+UPDATE ryan_raw
+SET departure_ts          = unix_timestamp(STR_TO_DATE(`departure`, "%Y-%m-%dT%H:%i:%s.000")),
+  arrival_ts              = unix_timestamp(STR_TO_DATE(`arrival`, "%Y-%m-%dT%H:%i:%s.000")),
+  departure_secs_midnight = (FROM_UNIXTIME(departure_ts, '%H') * 60 * 60) + (FROM_UNIXTIME(departure_ts, '%i') * 60) +
+                            (FROM_UNIXTIME(departure_ts, '%s'))
+WHERE departure_ts IS NULL;
+
+
 
 */
