@@ -48,7 +48,7 @@ echo "<script src=\"https://code.highcharts.com/highcharts.js\"></script>";
 echo "<script src=\"https://code.highcharts.com/highcharts-more.js\"></script>";
 
 $sql = "SELECT flight_number, FROM_UNIXTIME(departure_secs_midnight,'%H:%i') AS departure
-          FROM dwh.ryan_data
+          FROM ryan_data
           WHERE trip=?
           GROUP BY flight_number, departure_secs_midnight
           ORDER BY departure_secs_midnight;";
