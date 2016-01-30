@@ -67,6 +67,7 @@ CREATE TABLE ryan_data
   import_session_id       VARCHAR(100)
 
 )
+  ENGINE = InnoDB
   DEFAULT CHARSET = utf8;
 CREATE INDEX idx_trip ON ryan_data (trip);
 CREATE INDEX idx_fligth_number ON ryan_data (flight_number);
