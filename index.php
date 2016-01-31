@@ -21,12 +21,38 @@ $trip_requested = empty($_GET['trip']) ? FALSE : trim($_GET['trip']);
 $trip_requested_allowed = FALSE;
 $trips = $dbh->query("SELECT trip, count(*) AS c FROM ryan_data GROUP BY trip ORDER BY trip;");
 
+
+$dep_start = empty($_GET['dep_start']) ? 0 : intval($_GET['dep_start']);
+if ($dep_start > 23) {
+  $dep_start = 0;
+}
+$dep_stop = empty($_GET['dep_stop']) ? 0 : intval($_GET['dep_stop']);
+if ($dep_stop == 0 or $dep_stop > 24) {
+  $dep_stop = 24;
+}
+if ($dep_stop < $dep_start) {
+  $dep_stop = 24;
+}
+$month = empty($_GET['month']) ? 13 : intval($_GET['month']);
+if ($month > 13) {
+  $month = 13;
+}
+if ($month < 10) {
+  $month = (string) "0" . $month;
+}
+else {
+  $month = (string) $month;
+}
+
+
 while ($trip = $trips->fetch(PDO::FETCH_ASSOC)) {
   echo "<a href='?trip=" . $trip['trip'] . "'>" . $trip['trip'] . "</a> (" . $trip['c'] . " trips)&nbsp;&nbsp;&nbsp;&nbsp;";
   if ($trip_requested !== FALSE && $trip_requested == $trip['trip']) {
     $trip_requested_allowed = TRUE;
   }
 }
+
+
 echo "<br><br>";
 
 if ($trip_requested === FALSE) {
@@ -39,6 +65,28 @@ if ($trip_requested_allowed === FALSE) {
   exit;
 }
 
+echo "<br><br>";
+
+echo "DEP. START: ";
+for ($i = 0; $i <= 24; $i = $i + 2) {
+  echo "<a href='?trip=$trip_requested&dep_start=$i&dep_stop=$dep_stop'>$i</a> &nbsp;&nbsp;&nbsp;";
+}
+echo "<br><br>";
+
+echo "DEP. STOP: ";
+for ($i = 0; $i <= 24; $i = $i + 2) {
+  echo "<a href='?trip=$trip_requested&dep_start=$dep_start&dep_stop=$i'>$i</a> &nbsp;&nbsp;&nbsp;";
+}
+echo "<br><br>";
+echo "MONTH: ";
+for ($i = 1; $i <= 13; $i++) {
+  echo "<a href='?trip=$trip_requested&dep_start=$dep_start&dep_stop=$dep_stop&month=$i'>" . ($i == 13 ? "ALL" : $i) . "</a> &nbsp;&nbsp;&nbsp;";
+}
+
+echo "<br><br>";
+$dep_start_ts = $dep_start * 60 * 60;
+$dep_stop_ts = $dep_stop * 60 * 60;
+
 
 //IF WE ARE HERE TRIP IS OK... let's go
 
@@ -46,48 +94,56 @@ if ($trip_requested_allowed === FALSE) {
 echo "<script src=\"http://code.jquery.com/jquery-2.2.0.min.js\"></script>";
 echo "<script src=\"https://code.highcharts.com/highcharts.js\"></script>";
 echo "<script src=\"https://code.highcharts.com/highcharts-more.js\"></script>";
+echo "<script src=\"https://code.highcharts.com/modules/exporting.js\"></script>";
 
-$sql = "SELECT flight_number, FROM_UNIXTIME(departure_secs_midnight,'%H:%i') AS departure, departure_secs_midnight
+$sql_args = array();
+if ($month == "13") {
+  $sql_month_inj = "";
+}
+else {
+  $sql_month_inj = "AND departure_mm = :month";
+  $sql_args['month'] = $month;
+}
+
+
+$sql = "SELECT *
           FROM ryan_data
-          WHERE trip=?
-          GROUP BY flight_number, departure_secs_midnight
-          ORDER BY departure_secs_midnight;";
+          WHERE trip=:trip
+          AND departure_secs_midnight >= :dep_start
+          AND departure_secs_midnight <= :dep_stop
+          $sql_month_inj
+          ORDER BY departure_yyyymmdd;";
 
-
-$stmt = $dbh->prepare($sql);
-$stmt->execute(array($trip_requested));
-
-echo "<b>$trip_requested</b> " . $stmt->rowCount() . " flights found<br><br>";
-
-while ($flight = $stmt->fetch(PDO::FETCH_ASSOC)) {
-
-  echo $flight['flight_number'] . " (" . $flight['departure'] . ")<br>";
-
-  //flight number is unique so we can query the db based on that to retrieve trips....
-  $sql = "SELECT * FROM ryan_data WHERE flight_number=? AND departure_secs_midnight = ?
-          ORDER BY departure_yyyymmdd_ts;";
-  $stmt_flight_sched = $dbh->prepare($sql);
-  $stmt_flight_sched->execute(array(
-    $flight['flight_number'],
-    $flight['departure_secs_midnight']
-  ));
-  if ($stmt_flight_sched->rowCount() == 0) {
-    echo "NO SCHEDULED FLIGHTS.<br><br>";
+$stmt_flight_sched = $dbh->prepare($sql);
+$sql_args['trip'] = $trip_requested;
+$sql_args['dep_start'] = $dep_start_ts;
+$sql_args['dep_stop'] = $dep_stop_ts;
+$stmt_flight_sched->execute($sql_args);
+if ($stmt_flight_sched->rowCount() == 0) {
+  echo "NO SCHEDULED FLIGHTS FOR $trip_requested DEPARTURE $dep_start --> $dep_stop ";
+  if ($month <> "13") {
+    echo "(MONTH $month)";
   }
-  else {
-    $scheduled = $stmt_flight_sched->fetchAll(PDO::FETCH_ASSOC);
-    $stmt_flight_sched = NULL;
-    unset($stmt_flight_sched);
-    writeScript($flight, $scheduled);
+  echo "<br><br>";
+}
+else {
+  $scheduled = $stmt_flight_sched->fetchAll(PDO::FETCH_ASSOC);
+  $stmt_flight_sched = NULL;
+  unset($stmt_flight_sched);
+  $title = "$trip_requested (departures $dep_start->$dep_stop) ";
+  if ($month <> "13") {
+    $title .= " (MONTH $month) ";
   }
+  writeScript($scheduled, $title);
+}
 
 
-} //end while
-
-
-function writeScript($flight_number, $scheduled) {
+function writeScript($scheduled, $title = NULL) {
+  if (is_null($title)) {
+    $title = "Fares";
+  }
   $chart_container = "container_" . md5(microtime(TRUE));
-  echo "<div id=\"" . $chart_container . "\" style=\"min-width: 310px; height: 600px; margin: 0 auto\"></div>";
+  echo "<div id=\"" . $chart_container . "\" style=\"min-width: 310px; height: 700px; margin: 0 auto\"></div>";
 
   $categories = $fares_eco = $fares_business = array();
   $currency = "";
@@ -109,14 +165,15 @@ function writeScript($flight_number, $scheduled) {
   <script>
     $(function () {
       $('#<?php echo $chart_container;?>').highcharts({
+        colors: ['#b3e0ff', '#66c0ff'],
         chart: {
           type: 'column'
         },
         title: {
-          text: 'Fares (<?php echo $currency;?>)'
+          text: '<?php echo "$title ($currency)";?>'
         },
         subtitle: {
-          text: 'FRANKIE!'
+          text: 'Esperimento del Frenke!'
         },
         xAxis: {
           categories: <?php echo json_encode($categories);?>,
