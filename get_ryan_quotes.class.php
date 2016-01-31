@@ -61,6 +61,8 @@ class get_ryan_quotes {
     echo "DAYS TO CHECK: " . $this->days_to_check . $this->nl;
     echo "START DATE: " . date("d-m-Y", $this->first_timestamp) . $this->nl;
     echo "END DATE: " . date("d-m-Y", $this->last_timestamp) . $this->nl;
+    echo "REMOVING OLD RAW FARES" . $this->nl;
+    $this->truncateTable('ryan_raw');
     foreach ($this->trips as $trip) {
       $this->fares = array();
       $Origin = $trip[0];
@@ -120,6 +122,9 @@ class get_ryan_quotes {
   }
 
   protected function truncateTable($t) {
+    if (empty($this->dbh)) {
+      $this->dbh = $this->connectToDb();
+    }
     $sql = "TRUNCATE $t;";
     try {
       $stmt = $this->dbh->prepare($sql);
