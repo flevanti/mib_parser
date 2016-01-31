@@ -72,6 +72,8 @@ CREATE TABLE ryan_data
 CREATE INDEX idx_trip ON ryan_data (trip);
 CREATE INDEX idx_fligth_number ON ryan_data (flight_number);
 
+ALTER TABLE ryan_data ADD departure_yyyymmdd_ts INT NULL;
+
 
 /*
 

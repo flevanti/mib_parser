@@ -137,7 +137,24 @@ class get_ryan_quotes {
 
   protected function aggregateData() {
 
-    $sql = "INSERT INTO ryan_data
+    $sql = "INSERT INTO ryan_data (
+                id,
+                flight_number,
+                trip,
+                fare_currency,
+                max_eco,
+                min_eco,
+                fare_eco_,
+                max_business,
+                min_business,
+                fare_business_,
+                departure_yyyymmdd,
+                departure_mm,
+                departure_dd,
+                departure_secs_midnight,
+                ts_retrieved,
+                import_session_id,
+                departure_yyyymmdd_ts)
                 SELECT
                   id,
                   flight_number,
@@ -154,7 +171,8 @@ class get_ryan_quotes {
                   departure_dd,
                   departure_secs_midnight,
                   ts_retrieved,
-                  import_session_id
+                  import_session_id,
+                  UNIX_TIMESTAMP(STR_TO_DATE(departure_yyyymmdd, '%Y%m%d'))
                 FROM (
                        SELECT
                          id,
@@ -172,9 +190,7 @@ class get_ryan_quotes {
                          ts_retrieved,
                          import_session_id
                        FROM ryan_raw
-                       -- where flight_number ='FR 1045'
-                       ORDER BY ts_retrieved DESC
-
+                       ORDER BY ts_retrieved DESC -- this is the trick to have the last current fare when grouping
                      ) t
                 GROUP BY flight_number,
                   trip,
